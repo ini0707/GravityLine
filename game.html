@@ -1,0 +1,370 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+	<head>
+		<meta charset="UTF-8">
+			<title>Гравити-лайн</title>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+				<!-- Подключаем крутой шрифт для цифр -->
+				<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
+
+					<style>
+						* { margin: 0; padding: 0; box-sizing: border-box; }
+						body {
+						background: #000;
+						overflow: hidden;
+						}
+
+						#ui {
+						position: absolute; top: 1vh; width: 100%; display: flex; justify-content: space-between; padding: 0 1vh;
+						}
+
+						/* Капсула очков */
+						#score {
+						background: linear-gradient(90deg, #5b2a8a, #9d4edd, #5b2a8a);
+						color: #fff;
+						padding: 0 15px;
+						height: 5vh;
+						line-height: 5vh;
+						border-radius: 25px;
+						font-size: 3vh;
+						font-family: 'Orbitron', sans-serif;
+						text-shadow: 0 0 10px #9d4edd, 0 0 20px #9d4edd;
+						box-shadow: 0 0 15px #9d4edd;
+						display: flex;
+						align-items: center;
+						position: relative;
+						overflow: hidden;
+						}
+						#score::before {
+						content: "🧬";
+						margin-right: 8px;
+						font-size: 4vh;
+						}
+
+						/* Анимация увеличения цифр */
+						.score-pop {
+						position: absolute;
+						top: 50%;
+						right: 15px;
+						transform: translate(50%, -50%) scale(2);
+						opacity: 0;
+						color: #ff00ff;
+						font-size: 5vh;
+						pointer-events: none;
+						transition: transform 0.5s ease-out, opacity 0.5s ease-out;
+						}
+
+						#lives {
+						display: flex;
+						gap: 10px;
+						font-size: 4vh;
+						}
+						.heart {
+						color: #ff66cc;
+						text-shadow: 0 0 10px #ff66cc, 0 0 20px #ff66cc;
+						transition: opacity 0.3s ease, text-shadow 0.3s ease;
+						}
+						.heart.empty {
+						color: #33001a;
+						text-shadow: none;
+						opacity: 0.3;
+						}
+
+						#platform {
+						position: absolute;
+						width: 37.5%;
+						height: 4vh;
+						background: linear-gradient(90deg, #0055a0, #00bfff, #0055a0);
+						bottom: 5vh;
+						left: 31.25%;
+						border-radius: 2vh;
+						box-shadow: 0 0 20px #00bfff, 0 0 40px #00bfff;
+						}
+
+						#block {
+						position: absolute;
+						width: 10vw;
+						height: 10vw;
+						background: linear-gradient(135deg, #333, #666, #333);
+						top: -12vw;
+						left: 45vw;
+						border-radius: 1vw;
+						box-shadow: 0 0 10px #666;
+						}
+
+						#ball {
+						position: absolute;
+						width: 8vw;
+						height: 8vw;
+						background: radial-gradient(circle at 30% 30%, #89c4ff, #0077cc);
+						top: 50vh;
+						left: 46vw;
+						border-radius: 50vw;
+						display: none;
+						box-shadow: 0 0 25px #4da6ff, 0 0 50px #4da6ff;
+						}
+
+						/* РЕАЛИСТИЧНЫЙ ПОРТАЛ (Черная дыра) */
+						#portal {
+						position: absolute;
+						width: 12vw;
+						height: 12vw;
+						background: conic-gradient(from 0deg, #440066, #000, #110022);
+						top: 2vh;
+						left: 44vw;
+						display: none;
+						border-radius: 50%;
+						border: 3px solid #8800cc;
+						box-shadow: 0 0 30px #ff00ff, inset 0 0 20px #00ffff;
+						display: flex;
+						align-items: center;
+						justify-content: center;
+						color: #00ffff;
+						font-weight: bold;
+						font-size: 3vh;
+						overflow: hidden;
+						}
+						#portal::after {
+						content: "";
+						position: absolute;
+						width: 100%;
+						height: 100%;
+						background: conic-gradient(from 180deg, transparent 10%, #00ffff 40%, #ff00ff 60%, transparent 90%);
+						animation: spin 4s linear infinite;
+						border-radius: 50%;
+						}
+						#portal::before {
+						content: "";
+						position: absolute;
+						width: 60%;
+						height: 60%;
+						background: radial-gradient(circle, #000 40%, #110022 100%);
+						border-radius: 50%;
+						}
+
+						@keyframes spin {
+						0% { transform: rotate(0deg); }
+						100% { transform: rotate(360deg); }
+						}
+					</style>
+				</head>
+	<body>
+		<div id="ui">
+			<div id="score">100</div>
+			<div id="lives">
+				<span id="heart1" class="heart">❤️</span>
+				<span id="heart2" class="heart">❤️</span>
+				<span id="heart3" class="heart">❤️</span>
+			</div>
+		</div>
+		<div id="platform"></div>
+		<div id="block"></div>
+		<div id="ball"></div>
+		<div id="portal"></div>
+
+		<!-- Элемент для анимации цифр -->
+		<div id="score-popup" class="score-pop">+20</div>
+
+		<audio id="snd-catch" src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-2213.mp3"></audio>
+		<audio id="snd-goal" src="https://assets.mixkit.co/sfx/preview/mixkit-winning-retro-arcade-game-alert-2242.mp3"></audio>
+		<audio id="snd-miss" src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-lose-life-2244.mp3"></audio>
+
+		<script>
+			const plat = document.getElementById('platform');
+			const blk = document.getElementById('block');
+			const ball = document.getElementById('ball');
+			const portal = document.getElementById('portal');
+			const scr = document.getElementById('score');
+			const popup = document.getElementById('score-popup');
+
+			const h1 = document.getElementById('heart1');
+			const h2 = document.getElementById('heart2');
+			const h3 = document.getElementById('heart3');
+
+			const sndCatch = document.getElementById('snd-catch');
+			const sndGoal = document.getElementById('snd-goal');
+			const sndMiss = document.getElementById('snd-miss');
+
+			let px = 31.25, by = -12, pts = 100, over = false;
+			let bx = 46, bY = 50, bvx = 0, bvy = 0, ballOn = false;
+			let moveSpeed = 0;
+			let lives = 3;
+			let audioUnlocked = false;
+
+			function updateHearts() {
+			h1.classList.toggle('empty', lives < 1);
+            h2.classList.toggle('empty', lives < 2);
+            h3.classList.toggle('empty', lives < 3);
+        }
+
+        function updateScore() {
+            scr.innerText = pts;
+        }
+
+        // Функция анимации цифр
+        function showScorePopup(value) {
+            popup.textContent = '+' + value;
+            popup.style.opacity = '1';
+            popup.style.transform = 'translate(50%, -150%) scale(1.5)';
+            
+            setTimeout(() => {
+                popup.style.opacity = '0';
+                popup.style.transform = 'translate(50%, -150%) scale(0.5)';
+            }, 400);
+        }
+
+        function unlockAudio() {
+            if (audioUnlocked) return;
+            sndCatch.play().catch(() => {});
+            sndGoal.play().catch(() => {});
+            sndMiss.play().catch(() => {});
+            audioUnlocked = true;
+        }
+
+        function playSound(sound) {
+            if (!audioUnlocked) {
+                unlockAudio();
+                return;
+            }
+            sound.currentTime = 0;
+            sound.play();
+        }
+
+        function loop() {
+            if (over) return;
+
+            if (moveSpeed !== 0) {
+                px += moveSpeed;
+                if (px < 0) px = 0;
+                if (px > 62.5) px = 62.5;
+                plat.style.left = px + '%';
+            }
+
+            by += 1.33; 
+            blk.style.top = by + 'vw';
+            const blkRect = blk.getBoundingClientRect();
+            const platRect = plat.getBoundingClientRect();
+
+            if (blkRect.bottom > platRect.top) {
+                if (blkRect.left > platRect.left && blkRect.right < platRect.right) {
+                    pts += 10; 
+                    updateScore();
+                    playSound(sndCatch);
+                    resetBlock();
+                } else {
+                    lives--; 
+                    updateHearts(); 
+                    playSound(sndMiss);
+                    resetBlock(); 
+                    if (lives <= 0) end();
+			}
+			}
+
+			if (ballOn) {
+			bx += bvx;
+			bY += bvy * 0.66;
+			ball.style.left = bx + 'vw';
+			ball.style.top = bY + 'vh';
+			if (bx < 0 || bx > 92) bvx *= -1; 
+                if (bY < 0) bvy *= -1;
+
+                const ballRect = ball.getBoundingClientRect();
+                const portalRect = portal.getBoundingClientRect();
+
+                if (ballRect.bottom > portalRect.top && ballRect.top < portalRect.bottom && ballRect.left < portalRect.right && ballRect.right > portalRect.left) {
+			pts += 20;
+			updateScore();
+			showScorePopup(20); // Вызов анимации
+			playSound(sndGoal);
+			resetCycle();
+			}
+
+			if (ballRect.bottom < 0 || ballRect.top > window.innerHeight) {
+                    resetCycle();
+                }
+
+                if (ballRect.top > platRect.bottom) {
+                    let pt = 95; let pL = px; let pR = px + 37.5;
+                    if (bY > pt && bY < pt + 6 && bx > pL && bx < pR) { 
+                        bvy = -4; 
+                        bvx = ((bx - pL) / 37.5 - 0.5) * 3; 
+                    }
+                }
+            }
+            requestAnimationFrame(loop);
+        }
+
+        function resetBlock() {
+            by = -12; 
+            blk.style.top = by + 'vw'; 
+            blk.style.left = Math.random() * 80 + 10 + 'vw';
+        }
+
+        function resetCycle() {
+            ballOn = false;
+            ball.style.display = 'none';
+            portal.style.display = 'none';
+            moveSpeed = 0;
+            setTimeout(() => {
+                if (!over) {
+                    portal.style.display = 'block';
+                    spawnBall();
+                }
+            }, 1000);
+        }
+
+        function spawnBall() {
+            if (ballOn) return;
+            ballOn = true;
+            ball.style.display = 'block';
+            bx = 46; bY = 50;
+            ball.style.left = bx + 'vw'; ball.style.top = bY + 'vh';
+            bvx = (Math.random() > 0.5 ? 1 : -1) * 1.5;
+            bvy = -3;
+        }
+
+        function end() {
+            over = true;
+            alert('Игра окончена! Ваши очки: ' + pts);
+            location.reload();
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') moveSpeed = -2;
+            if (e.key === 'ArrowRight') moveSpeed = 2;
+            unlockAudio();
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' && moveSpeed < 0) moveSpeed = 0;
+            if (e.key === 'ArrowRight' && moveSpeed > 0) moveSpeed = 0;
+			});
+
+			let touchStartX = 0;
+			document.addEventListener('touchstart', (e) => {
+			touchStartX = e.touches[0].pageX;
+			unlockAudio();
+			}, {passive: true});
+
+			document.addEventListener('touchmove', (e) => {
+			if (over) return;
+			let touchEndX = e.touches[0].pageX;
+			let diff = touchEndX - touchStartX;
+			if (Math.abs(diff) > 10) {
+			moveSpeed = (diff > 0 ? 2 : -2);
+			touchStartX = touchEndX;
+			}
+			}, {passive: true});
+
+			document.addEventListener('touchend', () => {
+			moveSpeed = 0;
+			});
+
+			updateScore();
+			updateHearts();
+			portal.style.display = 'block';
+			spawnBall();
+			loop();
+		</script>
+	</body>
+</html>
